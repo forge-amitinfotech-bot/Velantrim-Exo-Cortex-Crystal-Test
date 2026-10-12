@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://velantrim.dev/schemas/metadata.schema.json",
+  "title": "Velantrim Provenance Metadata (target envelope)",
+  "description": "Target provenance metadata envelope for canonical-graph operations. This is a forward-looking contract: the current runtime represents provenance through the trace / receipt / audit structures (see trace.schema.json and core/audit.py), and does not yet emit this envelope (no schema_version / source_ref / trace_id fields are produced today). The enum blocks below mirror the canonical vocabulary in core/memory.py and fact.schema.json.",
+  "type": "object",
+  "required": ["schema_version", "source_ref", "trace_id", "created_at"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Semantic version of the metadata schema used (e.g. '1.0.0')"
+    },
+    "source_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Target field: identifies the originating artifact, session or document. Today the runtime stores the origin in the fact's 'source' field and evidence spans ('source_uri')."
+    },
+    "trace_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Target field: would link this record back to the answer trace/receipt that created it. Today receipts are identified by their sealed content digest, not a separate id."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "guardian_verified": {
+      "type": "boolean",
+      "default": false,
+      "description": "Reserved field. Not currently emitted or consumed by the Crystal runtime. Must default to false unless an explicit future review workflow sets it."
+    },
+    "claim_type": {
+      "type": "string",
+      "enum": [
+        "WORLD_FACT",
+        "USER_EXPERIENCE",
+        "EMOTION",
+        "INTERPRETATION",
+        "OPINION",
+        "GOAL",
+        "PREFERENCE"
+      ]
+    },
+    "truth_status": {
+      "type": "string",
+      "enum": [
+        "VERIFIED",
+        "USER_CLAIMED",
+        "UNVERIFIED",
+        "HYPOTHESIS",
+        "SUBJECTIVE"
+      ]
+    },
+    "source_status": {
+      "type": "string",
+      "enum": [
+        "USER_REPORTED",
+        "OBSERVED",
+        "DERIVED",
+        "EXTERNAL",
+        "LLM_OUTPUT",
+        "UNKNOWN"
+      ]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0
+    }
+  }
+}

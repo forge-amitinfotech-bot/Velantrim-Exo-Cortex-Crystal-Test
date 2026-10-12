@@ -1,0 +1,19 @@
+# Velantrim ExoCortex — runtime requirements
+#
+# The default runtime is intentionally Python standard library only.
+# This file is kept for compatibility with tools that expect a requirements.txt.
+# For local development, tests and CI use:
+#
+#   pip install -r requirements-dev.txt
+#
+# Optional add-ons are installed through pyproject extras, for example:
+#
+#   pip install '.[ladybug]'
+#   pip install '.[redis]'
+#   pip install '.[embeddings]'
+#   pip install '.[llm]'
+#   pip install '.[encryption]'
+#
+# L3 backend defaults:
+#   auto -> LadybugDB if installed -> on-disk SQLite -> in-memory mock.
+# Neo4j is an optional server backend and is never required by default.

@@ -1,0 +1,136 @@
+# core/kb_ingest.py
+# Velantrim ExoCortex — KB Dry-Run Batch Manifest (grant WP2/WP4 hardening)
+#
+# An institution wants to preview what would happen if they imported a curated
+# knowledge-base corpus before committing any writes. This module accepts a
+# batch manifest — a list of claim records or a JSONL/JSON file — and returns
+# a structured per-item verdict report WITHOUT writing anything to memory.
+#
+# Verdicts per item (same as imports.predict_claim):
+#   accept    — would pass Guardian + TruthGate and be stored
+#   duplicate — an identical claim already exists in canon (occurrence only)
+#   blocked   — rejected by Immune guard, Guardian, or TruthGate
+#   conflict  — passes gates but contradicts one or more canonical facts
+#
+# This module is a thin batch orchestrator over imports.predict_claim. It adds:
+#   - manifest file I/O (JSONL / JSON array)
+#   - per-item row normalisation
+#   - a compact summary dict
+#   - the `kb-ingest` CLI surface
+
+import json
+import os
+from typing import Any, Dict, List, Optional
+
+from core.imports import predict_claim
+from core.path_safety import resolve_safe_path
+from core.memory import SOURCE_STATUSES, CLAIM_TYPES
+
+_VERDICT_KEYS = ("accept", "duplicate", "blocked", "conflict")
+
+
+# ─── Batch dry-run ────────────────────────────────────────────────────────────
+
+def dry_run_batch(
+    claims: List[Dict[str, Any]],
+    *,
+    source: str = "kb-manifest",
+) -> Dict[str, Any]:
+    """Run a dry-run gate prediction over a list of claim records.
+
+    Each record must have a `"claim"` key. Optional keys:
+      source_status  (default: EXTERNAL)
+      claim_type     (auto-classified if absent)
+      confidence     (default: 0.6)
+      significance   (default: 0.5)
+
+    Returns a manifest dict with a summary and per-item verdicts. Nothing is
+    written to memory — identical behaviour to imports.predict_claim.
+    """
+    items: List[Dict[str, Any]] = []
+    for rec in claims:
+        claim_text = (rec.get("claim") or "").strip()
+        kwargs: Dict[str, Any] = {"source": rec.get("source", source)}
+
+        # Validate enum fields before passing to predict_claim so that typos
+        # like source_status="OUIJA_BOARD" return a clear block verdict here
+        # rather than silently being accepted in dry-run but failing on real
+        # ingest (which validates via core/memory.py enum checks).
+        if rec.get("source_status"):
+            ss = rec["source_status"]
+            if ss not in SOURCE_STATUSES:
+                items.append({
+                    "claim": claim_text,
+                    "verdict": "blocked",
+                    "reason": (
+                        f"invalid source_status {ss!r}; "
+                        f"valid values: {sorted(SOURCE_STATUSES)}"
+                    ),
+                })
+                continue
+            kwargs["source_status"] = ss
+        if rec.get("claim_type"):
+            ct = rec["claim_type"]
+            if ct not in CLAIM_TYPES:
+                items.append({
+                    "claim": claim_text,
+                    "verdict": "blocked",
+                    "reason": (
+                        f"invalid claim_type {ct!r}; "
+                        f"valid values: {sorted(CLAIM_TYPES)}"
+                    ),
+                })
+                continue
+            kwargs["claim_type"] = ct
+        if rec.get("confidence") is not None:
+            kwargs["confidence"] = rec["confidence"]
+        if rec.get("significance") is not None:
+            kwargs["significance"] = rec["significance"]
+        items.append(predict_claim(claim_text, **kwargs))
+    return _manifest_result(items, source=source)
+
+
+def dry_run_manifest_file(path: str, *, source: Optional[str] = None) -> Dict[str, Any]:
+    """Read a JSONL or JSON-array manifest file and run a batch dry-run.
+
+    Supported formats:
+      - JSONL (.jsonl / .ndjson): one claim record per line
+      - JSON array (.json): a top-level list of claim records
+
+    Each record must have a `"claim"` key (see dry_run_batch).
+    """
+    safe = resolve_safe_path(path)
+    path = str(safe)
+    src = source or os.path.basename(path)
+    ext = os.path.splitext(path)[1].lower()
+    with open(path, encoding="utf-8") as fh:
+        content = fh.read()
+    if ext in (".jsonl", ".ndjson"):
+        claims = [json.loads(line) for line in content.splitlines() if line.strip()]
+    else:
+        claims = json.loads(content)
+        if not isinstance(claims, list):
+            raise ValueError(
+                f"JSON manifest must be a top-level array of claim records, "
+                f"got {type(claims).__name__}"
+            )
+    return dry_run_batch(claims, source=src)
+
+
+# ─── Internal helpers ─────────────────────────────────────────────────────────
+
+def _manifest_result(items: List[Dict[str, Any]], *, source: str) -> Dict[str, Any]:
+    counts: Dict[str, int] = {k: 0 for k in _VERDICT_KEYS}
+    for it in items:
+        v = it.get("verdict", "blocked")
+        counts[v] = counts.get(v, 0) + 1
+    return {
+        "dry_run": True,
+        "source": source,
+        "total": len(items),
+        "would_accept": counts["accept"],
+        "would_duplicate": counts["duplicate"],
+        "would_block": counts["blocked"],
+        "conflicts": counts["conflict"],
+        "items": items,
+    }

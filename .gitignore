@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Data (SQLite, local graph, logs)
+data/
+demo-data/
+eval-artifacts/
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+*.log
+logs/
+
+# Secrets and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.token
+secrets/
+private/
+
+# Environment
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build and dist artifacts
+build/
+dist/
+exports/
+generated/
+
+# Project-specific: auto-generated reports
+migration_dependency_report.json
+*_diff.json
+*_backup_*.jsonl
+*_migrated.jsonl
+*_id_map.json
+*_deps.jsonl
+*.bak
+validate_dangling.json
+audit_issues.json
+
+# Evaluation harness artifacts (written by scripts/eval_gate.py on every run)
+metrics.jsonl
+eval_report.md
+
+# Claude Code session files
+.claude/
